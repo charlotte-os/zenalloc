@@ -1,7 +1,6 @@
 #![no_std]
 
 pub mod alloc_trait;
-mod alloc_trait;
 
 pub fn add(left: usize, right: usize) -> usize {
     left + right

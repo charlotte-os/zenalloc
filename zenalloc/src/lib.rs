@@ -4,45 +4,37 @@
 #![feature(alloc_layout_extra)]
 
 extern crate alloc;
+use alloc::alloc::{alloc, alloc_zeroed, dealloc, realloc};
 
-use core::alloc::{GlobalAlloc, Layout, AllocError};
+use core::alloc::{Layout, AllocError};
 use core::ptr::NonNull;
 use core::sync::atomic::{AtomicPtr, Ordering};
 use core::{mem, ptr};
+use crate::alloc_trait::Allocator;
 
 mod alloc_trait;
 
 pub struct System;
 
-unsafe impl GlobalAlloc for System {
-    unsafe fn alloc(&self, _layout: Layout) -> *mut u8 {
-        // Dummy implementation
-        ptr::null_mut()
-    }
-
-    unsafe fn dealloc(&self, _ptr: *mut u8, _layout: Layout) {
-        // Dummy implementation
-    }
-}
-
 impl System {
     #[inline]
     fn alloc_impl(&self, layout: Layout, zeroed: bool) -> Result<NonNull<[u8]>, AllocError> {
-        match layout.size() {
-            0 => Ok(NonNull::slice_from_raw_parts(layout.dangling(), 0)),
-            _ => {
-                let raw_ptr: *mut u8 = unsafe {
-                    if zeroed {
-                        System.alloc(layout)
-                    } else {
-                        System.alloc(layout)
-                    }
-                };
-
-                let ptr = NonNull::new(raw_ptr).ok_or(AllocError)?;
-                Ok(NonNull::slice_from_raw_parts(ptr, layout.size()))
-            }
+        if layout.size() == 0 {
+            return Ok(NonNull::slice_from_raw_parts(NonNull::dangling(), 0));
         }
+
+        let raw_ptr: *mut u8 = if zeroed {
+            unsafe { alloc_zeroed(layout) }
+        } else {
+            unsafe { alloc(layout) }
+        };
+
+        if raw_ptr.is_null() {
+            return Err(AllocError);
+        }
+
+        let ptr = NonNull::new(raw_ptr).ok_or(AllocError)?;
+        Ok(NonNull::slice_from_raw_parts(ptr, layout.size()))
     }
 
     #[inline]
@@ -58,29 +50,28 @@ impl System {
             "`new_layout.size()` must be greater than or equal to `old_layout.size()`"
         );
 
-        match old_layout.size() {
-            0 => self.alloc_impl(new_layout, zeroed),
-            old_size if old_layout.align() == new_layout.align() => {
-                let new_size = new_layout.size();
-                let raw_ptr = System.alloc(new_layout);
-                let new_ptr = NonNull::new(raw_ptr).ok_or(AllocError)?;
-
-                // core::ptr::copy_nonoverlapping(ptr.as_ptr(), new_ptr.as_ptr(), old_size);
-                if zeroed {
-                    new_ptr.as_ptr().add(old_size).write_bytes(0, new_size - old_size);
-                }
-                Ok(NonNull::slice_from_raw_parts(new_ptr, new_size))
-            }
-            old_size => {
-                let new_ptr = self.alloc_impl(new_layout, zeroed)?;
-                // core::ptr::copy_nonoverlapping(ptr.as_ptr(), new_ptr.as_ptr(), old_size);
-                Ok(new_ptr)
-            }
+        if old_layout.size() == 0 {
+            return self.alloc_impl(new_layout, zeroed);
         }
+
+        let new_size = new_layout.size();
+        let raw_ptr = realloc(ptr.as_ptr(), old_layout, new_size);
+
+        if raw_ptr.is_null() {
+            return Err(AllocError);
+        }
+
+        let new_ptr = NonNull::new_unchecked(raw_ptr);
+
+        if zeroed && new_size > old_layout.size() {
+            new_ptr.as_ptr().add(old_layout.size()).write_bytes(0, new_size - old_layout.size());
+        }
+
+        Ok(NonNull::slice_from_raw_parts(new_ptr, new_size))
     }
 }
 
-impl alloc_trait::Allocator for System {
+impl Allocator for System {
     #[inline]
     fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
         self.alloc_impl(layout, false)
@@ -93,7 +84,9 @@ impl alloc_trait::Allocator for System {
 
     #[inline]
     unsafe fn deallocate(&self, ptr: NonNull<u8>, layout: Layout) {
-        System.dealloc(ptr.as_ptr(), layout);
+        if layout.size() != 0 {
+            dealloc(ptr.as_ptr(), layout);
+        }
     }
 
     #[inline]
@@ -129,13 +122,13 @@ impl alloc_trait::Allocator for System {
         );
 
         match new_layout.size() {
-            0 => Ok(NonNull::slice_from_raw_parts(new_layout.dangling(), 0)),
+            0 => Ok(NonNull::slice_from_raw_parts(NonNull::dangling(), 0)),
             new_size if old_layout.align() == new_layout.align() => {
                 Ok(NonNull::slice_from_raw_parts(ptr, new_size))
             }
             new_size => {
                 let new_ptr = self.allocate(new_layout)?;
-                // core::ptr::copy_nonoverlapping(ptr.as_ptr(), new_ptr.as_ptr(), new_size);
+                core::ptr::copy_nonoverlapping(ptr.as_ptr(), new_ptr.as_ptr() as *mut u8, new_size);
                 Ok(new_ptr)
             }
         }
@@ -197,8 +190,8 @@ mod tests {
         let layout = Layout::from_size_align(1024, 8).unwrap();
         let ptr = System.allocate_zeroed(layout).unwrap();
         assert!(!ptr.as_ptr().is_null());
-        // let slice = unsafe { core::slice::from_raw_parts(ptr.as_ptr(), 1024) };
-        // assert!(slice.iter().all(|&byte| byte == 0));
+        let slice = unsafe { ptr.as_ref() };
+        assert!(slice.iter().all(|&byte| byte == 0));
         unsafe { System.deallocate(ptr.cast(), layout) };
     }
 

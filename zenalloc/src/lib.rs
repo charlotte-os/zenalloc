@@ -13,6 +13,7 @@ use core::{mem, ptr};
 use crate::alloc_trait::Allocator;
 
 mod alloc_trait;
+mod vec;
 
 pub struct System;
 
@@ -176,6 +177,7 @@ mod tests {
     use super::*;
     use core::alloc::Layout;
     use crate::alloc_trait::Allocator;
+    use crate::vec::raw_vec::RawVec;
 
     #[test]
     fn test_basic_allocation() {
@@ -253,5 +255,14 @@ mod tests {
         let _ = System.allocate(layout);
 
         take_alloc_error_hook();
+    }
+
+    #[test]
+    fn test_raw_vec() {
+        let mut vec = RawVec::<u8>::with_capacity(1024).unwrap();
+        assert_eq!(vec.capacity(), 1024);
+
+        vec.grow().unwrap();
+        assert_eq!(vec.capacity(), 2048);
     }
 }

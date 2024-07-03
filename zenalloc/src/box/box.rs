@@ -1,61 +1,60 @@
-use core::ptr::NonNull;
 use core::alloc::Layout;
-use core::mem;
-use core::ops::{Deref, DerefMut};
+use core::ptr::{self, NonNull};
 use crate::alloc_trait::Allocator;
+use crate::System;
 
-pub struct Box<T, A: Allocator> {
+pub struct Box<T> {
     ptr: NonNull<T>,
-    allocator: A,
-    layout: Layout,
 }
 
-impl<T, A: Allocator> Box<T, A> {
-    pub fn new_in(value: T, allocator: A) -> Result<Self, AllocError> {
-        // Determine the layout for type T
+impl<T> Box<T> {
+    // Allocate memory for a single value of type T
+    pub fn new(value: T) -> Result<Self, AllocError> {
+        // Create a layout for a single value of type T
         let layout = Layout::new::<T>();
-        
-        // Allocate memory for T using the custom allocator
-        let mem = allocator.allocate(layout)?.as_ptr() as *mut T;
-
-        // SAFETY: The allocation was successful, so we can assume `mem` is a valid pointer.
+        // Allocate memory using the custom allocator
+        let ptr = System.allocate(layout)?;
         unsafe {
-            mem::write(mem, value);
+            // Write the value to the allocated memory
+            ptr::write(ptr.as_ptr() as *mut T, value);
         }
-
-        Ok(Box {
-            ptr: NonNull::new(mem).ok_or(AllocError)?,
-            allocator,
-            layout,
-        })
+        Ok(Box { ptr: ptr.cast() })
     }
-}
 
-impl<T, A: Allocator> Deref for Box<T, A> {
-    type Target = T;
-
-    fn deref(&self) -> &T {
-        // SAFETY: The pointer is guaranteed to be valid as long as `Box` is valid.
+    // Get a reference to the contained value
+    pub fn as_ref(&self) -> &T {
         unsafe { self.ptr.as_ref() }
     }
-}
 
-impl<T, A: Allocator> DerefMut for Box<T, A> {
-    fn deref_mut(&mut self) -> &mut T {
-        // SAFETY: The pointer is guaranteed to be valid as long as `Box` is valid.
+    // Get a mutable reference to the contained value
+    pub fn as_mut(&mut self) -> &mut T {
         unsafe { self.ptr.as_mut() }
     }
 }
 
-impl<T, A: Allocator> Drop for Box<T, A> {
+impl<T> Drop for Box<T> {
     fn drop(&mut self) {
-        // SAFETY: The pointer is guaranteed to be valid as long as `Box` is valid.
+        // Deallocate the memory when the box is dropped
+        let layout = Layout::new::<T>();
         unsafe {
             // Drop the value
             ptr::drop_in_place(self.ptr.as_ptr());
-
             // Deallocate the memory
-            self.allocator.deallocate(self.ptr.cast(), self.layout);
+            System.deallocate(self.ptr.cast(), layout);
         }
+    }
+}
+
+impl<T> core::ops::Deref for Box<T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        self.as_ref()
+    }
+}
+
+impl<T> core::ops::DerefMut for Box<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        self.as_mut()
     }
 }

@@ -16,6 +16,7 @@ mod alloc_trait;
 mod vec;
 mod zen_box;
 mod zen_rc;
+mod zen_arc;
 
 pub struct System;
 
@@ -182,6 +183,7 @@ mod tests {
     use crate::vec::raw_vec::RawVec;
     use crate::zen_box::zen_box::ZenBox;
     use crate::zen_rc::zen_rc::ZenRc;
+    use crate::zen_arc::zen_arc::ZenArc;
 
     #[test]
     fn test_basic_allocation() {
@@ -306,6 +308,25 @@ mod tests {
         assert_eq!(ZenRc::strong_count(&rc2), 1);
 
         drop(rc2);
+        // Ensure no double free occurs
+    }
+
+    #[test]
+    fn test_arc() {
+        let value = 42;
+        let arc1 = ZenArc::new(value).unwrap();
+        assert_eq!(*arc1, value);
+        assert_eq!(ZenArc::strong_count(&arc1), 1);
+
+        let arc2 = ZenArc::clone(&arc1);
+        assert_eq!(*arc2, value);
+        assert_eq!(ZenArc::strong_count(&arc1), 2);
+        assert_eq!(ZenArc::strong_count(&arc2), 2);
+
+        drop(arc1);
+        assert_eq!(ZenArc::strong_count(&arc2), 1);
+
+        drop(arc2);
         // Ensure no double free occurs
     }
 }

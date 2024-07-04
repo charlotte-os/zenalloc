@@ -4,8 +4,8 @@
 #![feature(alloc_layout_extra)]
 
 extern crate alloc;
-
 use alloc::alloc::{alloc, alloc_zeroed, dealloc, realloc};
+
 use core::alloc::{Layout, AllocError};
 use core::ptr::NonNull;
 use core::sync::atomic::{AtomicPtr, Ordering};
@@ -15,6 +15,7 @@ use crate::alloc_trait::Allocator;
 mod alloc_trait;
 mod vec;
 mod zen_box;
+mod zen_rc;
 
 pub struct System;
 
@@ -180,6 +181,7 @@ mod tests {
     use crate::alloc_trait::Allocator;
     use crate::vec::raw_vec::RawVec;
     use crate::zen_box::zen_box::ZenBox;
+    use crate::zen_rc::zen_rc::ZenRc;
 
     #[test]
     fn test_basic_allocation() {
@@ -286,5 +288,24 @@ mod tests {
         let value = ZenBox::new(42).unwrap();
         drop(value);
         // Box should deallocate memory without issues
+    }
+
+    #[test]
+    fn test_rc() {
+        let value = 42;
+        let rc1 = ZenRc::new(value).unwrap();
+        assert_eq!(*rc1, value);
+        assert_eq!(ZenRc::strong_count(&rc1), 1);
+
+        let rc2 = ZenRc::clone(&rc1);
+        assert_eq!(*rc2, value);
+        assert_eq!(ZenRc::strong_count(&rc1), 2);
+        assert_eq!(ZenRc::strong_count(&rc2), 2);
+
+        drop(rc1);
+        assert_eq!(ZenRc::strong_count(&rc2), 1);
+
+        drop(rc2);
+        // Ensure no double free occurs
     }
 }

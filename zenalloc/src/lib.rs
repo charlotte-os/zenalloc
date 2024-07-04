@@ -17,6 +17,7 @@ mod vec;
 mod zen_box;
 mod zen_rc;
 mod zen_arc;
+mod zen_cow;
 
 pub struct System;
 
@@ -184,6 +185,7 @@ mod tests {
     use crate::zen_box::zen_box::ZenBox;
     use crate::zen_rc::zen_rc::ZenRc;
     use crate::zen_arc::zen_arc::ZenArc;
+    use crate::zen_cow::zen_cow::ZenCow;
 
     #[test]
     fn test_basic_allocation() {
@@ -328,5 +330,18 @@ mod tests {
 
         drop(arc2);
         // Ensure no double free occurs
+    }
+
+    #[test]
+    fn test_zen_cow() {
+        let cow1 = ZenCow::new(42).unwrap();
+        assert_eq!(*cow1.as_ref(), 42);
+
+        let mut cow2 = cow1.clone();
+        assert_eq!(*cow2.as_ref(), 42);
+
+        *cow2.get_mut() = 100;
+        assert_eq!(*cow2.as_ref(), 100);
+        assert_eq!(*cow1.as_ref(), 42); // Ensure cow1 is unchanged
     }
 }

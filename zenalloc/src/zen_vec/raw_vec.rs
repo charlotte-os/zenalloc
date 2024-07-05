@@ -1,6 +1,5 @@
 use core::alloc::{Layout, AllocError};
 use core::ptr::NonNull;
-use core::mem;
 use crate::alloc_trait::Allocator;
 use crate::System;
 

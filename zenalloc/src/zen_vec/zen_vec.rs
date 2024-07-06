@@ -168,3 +168,6 @@ where
         self == other.as_slice()
     }
 }
+
+unsafe impl<T: Send> Send for ZenVec<T> {}
+unsafe impl<T: Sync> Sync for ZenVec<T> {}

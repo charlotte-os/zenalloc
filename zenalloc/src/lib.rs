@@ -6,18 +6,18 @@
 extern crate alloc;
 use alloc::alloc::{alloc, alloc_zeroed, dealloc, realloc};
 
-use core::alloc::{Layout, AllocError};
+use crate::alloc_trait::Allocator;
+use core::alloc::{AllocError, Layout};
 use core::ptr::NonNull;
 use core::sync::atomic::{AtomicPtr, Ordering};
 use core::{mem, ptr};
-use crate::alloc_trait::Allocator;
 
 mod alloc_trait;
-mod vec;
-mod zen_box;
-mod zen_rc;
 mod zen_arc;
+mod zen_box;
 mod zen_cow;
+mod zen_rc;
+mod zen_vec;
 
 pub struct System;
 
@@ -69,7 +69,10 @@ impl System {
         let new_ptr = NonNull::new_unchecked(raw_ptr);
 
         if zeroed && new_size > old_layout.size() {
-            new_ptr.as_ptr().add(old_layout.size()).write_bytes(0, new_size - old_layout.size());
+            new_ptr
+                .as_ptr()
+                .add(old_layout.size())
+                .write_bytes(0, new_size - old_layout.size());
         }
 
         Ok(NonNull::slice_from_raw_parts(new_ptr, new_size))
@@ -163,12 +166,11 @@ fn default_alloc_error_hook(_layout: Layout) {
 #[cfg_attr(not(test), alloc_error_handler)]
 fn rust_oom(layout: Layout) -> ! {
     let hook = HOOK.load(Ordering::Acquire);
-    let hook: fn(Layout) =
-        if hook.is_null() {
-            default_alloc_error_hook
-        } else {
-            unsafe { mem::transmute(hook) }
-        };
+    let hook: fn(Layout) = if hook.is_null() {
+        default_alloc_error_hook
+    } else {
+        unsafe { mem::transmute(hook) }
+    };
     hook(layout);
     loop {}
 }
@@ -178,14 +180,17 @@ extern crate std;
 
 #[cfg(test)]
 mod tests {
+    use zen_vec::zen_vec::VecError;
+
     use super::*;
-    use core::alloc::Layout;
     use crate::alloc_trait::Allocator;
-    use crate::vec::raw_vec::RawVec;
-    use crate::zen_box::zen_box::ZenBox;
-    use crate::zen_rc::zen_rc::ZenRc;
     use crate::zen_arc::zen_arc::ZenArc;
+    use crate::zen_box::zen_box::ZenBox;
     use crate::zen_cow::zen_cow::ZenCow;
+    use crate::zen_rc::zen_rc::ZenRc;
+    use crate::zen_vec::raw_vec::RawVec;
+    use crate::zen_vec::zen_vec::ZenVec;
+    use core::alloc::Layout;
 
     #[test]
     fn test_basic_allocation() {
@@ -272,6 +277,61 @@ mod tests {
 
         vec.grow().unwrap();
         assert_eq!(vec.capacity(), 2048);
+    }
+
+    #[test]
+    fn test_zen_vec_ops() {
+        let mut vec: ZenVec<u8> = ZenVec::new();
+        assert!(vec.is_empty(), "ZenVec is_empty() failed");
+
+        assert!(vec.push(0) == Ok(()), "ZenVec push() return failed");
+        assert!(vec == [0], "ZenVec push() failed");
+
+        let value = vec.pop();
+        assert!(value == Some(0), "ZenVec pop() failed");
+
+        assert!(vec.push(0) == Ok(()), "ZenVec push() #1 return failed");
+        assert!(vec.push(1) == Ok(()), "ZenVec push() #2 return failed");
+        assert!(vec.push(2) == Ok(()), "ZenVec push() #3 return failed");
+        assert!(vec == [0, 1, 2], "ZenVec multi-push failed");
+
+        assert!(vec.remove(3) == Err(VecError::IndexOutOfBounds), "ZenVec index checking failed");
+        
+        assert!(vec.remove(1) == Ok(1), "ZenVec remove() return failed");
+        assert!(vec == [0, 2], "ZenVec remove() failed");
+
+        assert!(vec.insert(1, 1) == Ok(()), "ZenVec insert() return failed");
+        assert!(vec == [0, 1, 2], "ZenVec insert() failed");
+    }
+
+    #[test]
+    fn test_non_zen_vec_ops() {
+        let mut vec: ZenVec<u8> = ZenVec::new();
+        for i in 1..4 {
+            let _ = vec.push(i);
+        }
+
+        assert!(vec.binary_search(&3) == Ok(2), "ZenVec binary_search() #1 failed");
+        assert!(vec.binary_search(&1) == Ok(0), "ZenVec binary_search() #2 failed");
+        assert!(vec.contains(&1), "ZenVec contains() failed");
+        vec.reverse();
+        assert!(vec == [3, 2, 1], "ZenVec reversed() failed");
+    }
+
+    #[test]
+    fn test_zen_vec_partialeq() {
+        let mut vec1: ZenVec<u8> = ZenVec::new();
+        let mut vec2: ZenVec<u8> = ZenVec::new();
+        for i in 0..4 {
+            let _ = vec1.push(i);
+            let _ = vec2.push(i);
+        }
+        assert_eq!(vec1.get(0), Some(&0));
+        assert!(vec1 == vec2, "PartialEq #1 fail for ZenVec");
+
+        vec2.pop();
+        assert!(vec1 != vec2, "PartialEq #2 fail for ZenVec");
+        assert!(vec1 == [0, 1, 2, 3]);
     }
 
     #[test]

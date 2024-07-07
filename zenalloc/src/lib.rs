@@ -404,4 +404,15 @@ mod tests {
         assert_eq!(*cow2.as_ref(), 100);
         assert_eq!(*cow1.as_ref(), 42); // Ensure cow1 is unchanged
     }
+
+    #[test]
+    fn test_send_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        
+        assert_send_sync::<ZenBox<u32>>();
+        assert_send_sync::<ZenRc<u32>>();
+        assert_send_sync::<ZenArc<u32>>();
+        assert_send_sync::<ZenCow<u32>>();
+        assert_send_sync::<ZenVec<u32>>();
+    }
 }

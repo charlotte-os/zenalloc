@@ -75,3 +75,6 @@ impl<T> Drop for RawVec<T> {
         }
     }
 }
+
+unsafe impl<T: Send> Send for RawVec<T> {}
+unsafe impl<T: Sync> Sync for RawVec<T> {}

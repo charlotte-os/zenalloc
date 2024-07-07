@@ -70,3 +70,6 @@ impl<T> Drop for ZenRc<T> {
         }
     }
 }
+
+unsafe impl<T: Send + Sync> Send for ZenRc<T> {}
+unsafe impl<T: Sync> Sync for ZenRc<T> {}

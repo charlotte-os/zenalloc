@@ -49,3 +49,6 @@ impl<T> core::ops::DerefMut for ZenBox<T> {
         self.as_mut()
     }
 }
+
+unsafe impl<T: Send> Send for ZenBox<T> {}
+unsafe impl<T: Sync> Sync for ZenBox<T> {}

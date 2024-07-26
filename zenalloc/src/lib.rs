@@ -17,6 +17,7 @@ mod zen_arc;
 mod zen_box;
 mod zen_cow;
 mod zen_rc;
+mod zen_string;
 mod zen_vec;
 
 pub struct System;
@@ -188,6 +189,7 @@ mod tests {
     use crate::zen_box::zen_box::ZenBox;
     use crate::zen_cow::zen_cow::ZenCow;
     use crate::zen_rc::zen_rc::ZenRc;
+    use crate::zen_string::zen_ascii_string::ZenAsciiString;
     use crate::zen_vec::raw_vec::RawVec;
     use crate::zen_vec::zen_vec::ZenVec;
     use core::alloc::Layout;
@@ -347,6 +349,15 @@ mod tests {
         assert_eq!(iter.next(), Some(&2));
         assert_eq!(iter.next(), Some(&3));
         assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_zen_ascii_string() {
+        let string = match ZenAsciiString::from_str("Hello World") {
+            Ok(str) => str,
+            Err(_) => panic!("ZenAsciiString::from_str() failed"),
+        };
+        assert!(string.len() == 11, "ZenAsciiString length check failed");
     }
 
     #[test]

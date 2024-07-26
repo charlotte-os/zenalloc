@@ -17,19 +17,26 @@ pub struct ZenVec<T> {
 }
 
 impl<T> ZenVec<T> {
-    fn ptr(&self) -> *mut T {
-        self.buf.ptr().as_ptr()
-    }
-
-    fn cap(&self) -> usize {
-        self.buf.capacity()
-    }
-
     pub fn new() -> Self {
         Self {
             buf: RawVec::new(),
             len: 0,
         }
+    }
+
+    pub fn with_capacity(capacity: usize) -> Result<Self, core::alloc::AllocError> {
+        Ok(Self {
+            buf: RawVec::with_capacity(capacity)?,
+            len: 0,
+        })
+    }
+
+    pub fn ptr(&self) -> *mut T {
+        self.buf.ptr().as_ptr()
+    }
+
+    pub fn cap(&self) -> usize {
+        self.buf.capacity()
     }
 
     pub fn push(&mut self, elem: T) -> Result<(), VecError> {

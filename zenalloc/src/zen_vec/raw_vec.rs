@@ -63,6 +63,13 @@ impl<T> RawVec<T> {
     pub fn ptr(&self) -> NonNull<T> {
         self.ptr
     }
+
+    pub fn iter(&self) -> RawVecIter<T> {
+        RawVecIter {
+            raw_vec: self,
+            index: 0,
+        }
+    }
 }
 
 // Implements the `Drop` trait for `RawVec` to ensure memory is properly deallocated.
@@ -72,6 +79,27 @@ impl<T> Drop for RawVec<T> {
         if self.cap != 0 {
             let layout = Layout::array::<T>(self.cap).unwrap();
             unsafe { System.deallocate(self.ptr.cast(), layout) };
+        }
+    }
+}
+
+pub struct RawVecIter<'a, T> {
+    raw_vec: &'a RawVec<T>,
+    index: usize,
+}
+
+impl<'a, T> Iterator for RawVecIter<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.raw_vec.capacity() {
+            unsafe {
+                let item = &*self.raw_vec.ptr.as_ptr().add(self.index);
+                self.index += 1;
+                Some(item)
+            }
+        } else {
+            None
         }
     }
 }

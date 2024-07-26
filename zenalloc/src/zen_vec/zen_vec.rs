@@ -5,7 +5,7 @@ use core::{
     ptr, slice,
 };
 
-#[derive(PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum VecError {
     IndexOutOfBounds,
     AllocationError(AllocError),
@@ -118,12 +118,25 @@ impl<T> ZenVec<T> {
     pub fn len(&self) -> usize {
         self.len
     }
+
+    pub fn iter(&self) -> ZenVecIter<'_, T> {
+        ZenVecIter {
+            zen_vec: self,
+            index: 0,
+        }
+    }
+
+    pub fn iter_mut(&mut self) -> ZenVecIterMut<'_, T> {
+        ZenVecIterMut {
+            zen_vec: self,
+            index: 0,
+        }
+    }
 }
 
 impl<T> Drop for ZenVec<T> {
     fn drop(&mut self) {
         while let Some(_) = self.pop() {}
-        /* Deallocation is handled by RawVec */
     }
 }
 
@@ -176,3 +189,48 @@ where
         self == other.as_slice()
     }
 }
+
+pub struct ZenVecIter<'a, T> {
+    zen_vec: &'a ZenVec<T>,
+    index: usize,
+}
+
+impl<'a, T> Iterator for ZenVecIter<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.zen_vec.len() {
+            unsafe {
+                let item = &*self.zen_vec.ptr().add(self.index);
+                self.index += 1;
+                Some(item)
+            }
+        } else {
+            None
+        }
+    }
+}
+
+pub struct ZenVecIterMut<'a, T> {
+    zen_vec: &'a mut ZenVec<T>,
+    index: usize,
+}
+
+impl<'a, T> Iterator for ZenVecIterMut<'a, T> {
+    type Item = &'a mut T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.zen_vec.len() {
+            unsafe {
+                let item = &mut *self.zen_vec.ptr().add(self.index);
+                self.index += 1;
+                Some(item)
+            }
+        } else {
+            None
+        }
+    }
+}
+
+unsafe impl<T: Send> Send for ZenVec<T> {}
+unsafe impl<T: Sync> Sync for ZenVec<T> {}

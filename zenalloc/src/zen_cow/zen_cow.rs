@@ -86,3 +86,6 @@ impl<T: Clone> Drop for ZenCow<T> {
         }
     }
 }
+
+unsafe impl<T: Send + Sync + Clone> Send for ZenCow<T> {}
+unsafe impl<T: Sync + Clone> Sync for ZenCow<T> {}

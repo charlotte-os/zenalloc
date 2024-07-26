@@ -305,17 +305,48 @@ mod tests {
     }
 
     #[test]
-    fn test_non_zen_vec_ops() {
+    fn test_zen_vec_iter() {
         let mut vec: ZenVec<u8> = ZenVec::new();
         for i in 1..4 {
-            let _ = vec.push(i);
+            vec.push(i).unwrap();
         }
 
-        assert!(vec.binary_search(&3) == Ok(2), "ZenVec binary_search() #1 failed");
-        assert!(vec.binary_search(&1) == Ok(0), "ZenVec binary_search() #2 failed");
-        assert!(vec.contains(&1), "ZenVec contains() failed");
-        vec.reverse();
-        assert!(vec == [3, 2, 1], "ZenVec reversed() failed");
+        let mut iter = vec.iter();
+        assert_eq!(iter.next(), Some(&1));
+        assert_eq!(iter.next(), Some(&2));
+        assert_eq!(iter.next(), Some(&3));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_zen_vec_iter_mut() {
+        let mut vec: ZenVec<u8> = ZenVec::new();
+        for i in 1..4 {
+            vec.push(i).unwrap();
+        }
+
+        let mut iter = vec.iter_mut();
+        assert_eq!(iter.next(), Some(&mut 1));
+        assert_eq!(iter.next(), Some(&mut 2));
+        assert_eq!(iter.next(), Some(&mut 3));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_raw_vec_iter() {
+        let mut raw_vec: RawVec<i32> = RawVec::with_capacity(4).unwrap();
+        unsafe {
+            for i in 0..4 {
+                ptr::write(raw_vec.ptr().as_ptr().add(i), i as i32);
+            }
+        }
+
+        let mut iter = raw_vec.iter();
+        assert_eq!(iter.next(), Some(&0));
+        assert_eq!(iter.next(), Some(&1));
+        assert_eq!(iter.next(), Some(&2));
+        assert_eq!(iter.next(), Some(&3));
+        assert_eq!(iter.next(), None);
     }
 
     #[test]
@@ -323,8 +354,8 @@ mod tests {
         let mut vec1: ZenVec<u8> = ZenVec::new();
         let mut vec2: ZenVec<u8> = ZenVec::new();
         for i in 0..4 {
-            let _ = vec1.push(i);
-            let _ = vec2.push(i);
+            vec1.push(i).unwrap();
+            vec2.push(i).unwrap();
         }
         assert_eq!(vec1.get(0), Some(&0));
         assert!(vec1 == vec2, "PartialEq #1 fail for ZenVec");

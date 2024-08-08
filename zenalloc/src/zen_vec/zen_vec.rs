@@ -17,14 +17,6 @@ pub struct ZenVec<T> {
 }
 
 impl<T> ZenVec<T> {
-    fn ptr(&self) -> *mut T {
-        self.buf.ptr().as_ptr()
-    }
-
-    fn cap(&self) -> usize {
-        self.buf.capacity()
-    }
-
     pub fn new() -> Self {
         Self {
             buf: RawVec::new(),
